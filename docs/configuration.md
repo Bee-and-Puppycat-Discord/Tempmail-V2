@@ -280,6 +280,10 @@ When using `logStorage = "attachment"`, the directory where the log files are st
 When using `logStorage = "attachment"`, if enabled, threads that don't have a log file will send a log link instead.
 Useful if transitioning from `logStorage = "local"` (the default).
 
+##### logOptions.localhost
+**Default:** `off`
+When using `logStorage = "local"`, if enabled, the log link will replace the IP address with "localhost".
+
 #### mainGuildId
 Alias for [mainServerId](#mainServerId)
 

@@ -1,5 +1,6 @@
 const moment = require("moment");
 const Eris = require("eris");
+const fs = require("fs");
 
 const bot = require("../bot");
 const knex = require("../knex");
@@ -120,7 +121,14 @@ class Thread {
     } catch (e) {
       // Channel not found
       if (e.code === 10003) {
-        console.log(`[INFO] Failed to send message to thread channel for ${this.user_name} because the channel no longer exists. Auto-closing the thread.`);
+        let timestamp = `[${moment.utc().format("YYYY-MM-DD hh:mm:ss A")}]`;
+        let channel_not_found_log = `${timestamp} [INFO] Failed to send message to thread channel for ${this.user_name} because the channel no longer exists. Auto-closing the thread.\n`;
+        fs.appendFile('./threads.log', channel_not_found_log, err => {
+          if (err) {
+            console.log(channel_not_found_log);
+            console.error(err);
+          }
+        });
         this.close(true);
       } else if (e.code === 240000) {
         console.log(`[INFO] Failed to send message to thread channel for ${this.user_name} because the message contains a link blocked by the harmful links filter`);
@@ -748,13 +756,16 @@ class Thread {
    * @returns {Promise<void>}
    */
   async close(suppressSystemMessage = false, silent = false) {
-    if (! suppressSystemMessage) {
-      console.log(`Closing thread ${this.id}`);
+    let timestamp = `[${moment.utc().format("YYYY-MM-DD hh:mm:ss A")}]`;
+    let thread_close_and_delete_log = `${timestamp} Closing thread ${this.id} on behalf of ${this.user_name}`;
 
+    if (! suppressSystemMessage) {
       if (silent) {
         await this.postSystemMessage("Closing thread silently...");
+        thread_close_and_delete_log = `${timestamp} Silently closing thread ${this.id}`
       } else {
         await this.postSystemMessage("Closing thread...");
+        thread_close_and_delete_log = `${timestamp} Closing thread ${this.id}`
       }
     }
 
@@ -769,7 +780,13 @@ class Thread {
     // Delete channel
     const channel = bot.getChannel(this.channel_id);
     if (channel) {
-      console.log(`Deleting channel ${this.channel_id}`);
+      thread_close_and_delete_log += `\n${timestamp} Deleting channel ${this.channel_id} (${channel.name})\n`
+      fs.appendFile('./threads.log', thread_close_and_delete_log, { flag: 'a' }, err => {
+        if (err) {
+          console.log(thread_close_and_delete_log)
+          console.error(err);
+        }
+      });
       await channel.delete("Thread closed");
     }
 

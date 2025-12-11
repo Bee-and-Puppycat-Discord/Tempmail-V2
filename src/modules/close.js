@@ -1,4 +1,5 @@
 const moment = require("moment");
+const fs = require('fs');
 const Eris = require("eris");
 const utils = require("../utils");
 const threads = require("../data/threads");
@@ -100,10 +101,12 @@ module.exports = ({ bot, knex, config, commands }) => {
     let silentClose = false;
     let suppressSystemMessages = false;
 
-    if (msg.channel instanceof Eris.PrivateChannel) {
-      // User is closing the thread by themselves (if enabled)
-      if (! config.allowUserClose) return;
+    if (msg.channel.guild == null) {
       if (await blocked.isBlocked(msg.author.id)) return;
+      if (msg.author.id != "260600155630338048") {
+        // User is closing the thread by themselves (if enabled)
+        if (! config.allowUserClose) return;
+      }
 
       thread = await threads.findOpenThreadByUserId(msg.author.id);
       if (! thread) return;
@@ -151,13 +154,14 @@ module.exports = ({ bot, knex, config, commands }) => {
         }
 
         const closeAt = moment.utc().add(delay, "ms");
+        const closeAtTime = `<t:${closeAt.unix()}:f>`
         await thread.scheduleClose(closeAt.format("YYYY-MM-DD HH:mm:ss"), msg.author, silentClose ? 1 : 0);
 
         let response;
         if (silentClose) {
-          response = `Thread is now scheduled to be closed silently in ${utils.humanizeDelay(delay)}. Use \`${config.prefix}close cancel\` to cancel.`;
+          response = `Thread is now scheduled to be closed silently in ${utils.humanizeDelay(delay)} (${closeAtTime}). Use \`${config.prefix}close cancel\` to cancel.`;
         } else {
-          response = `Thread is now scheduled to be closed in ${utils.humanizeDelay(delay)}. Use \`${config.prefix}close cancel\` to cancel.`;
+          response = `Thread is now scheduled to be closed in ${utils.humanizeDelay(delay)} (${closeAtTime}). Use \`${config.prefix}close cancel\` to cancel.`;
         }
 
         thread.postSystemMessage(response);
@@ -193,7 +197,15 @@ module.exports = ({ bot, knex, config, commands }) => {
     const thread = await threads.findOpenThreadByChannelId(channel.id);
     if (! thread) return;
 
-    console.log(`[INFO] Auto-closing thread with ${thread.user_name} because the channel was deleted`);
+    let timestamp = `[${moment.utc().format("YYYY-MM-DD hh:mm:ss A")}]`;
+    let auto_close_log = `${timestamp} [INFO] Auto-closing thread with ${thread.user_name} because the channel was deleted\n`;
+    fs.appendFile('./threads.log', auto_close_log, err => {
+      if (err) {
+        console.log(auto_close_log);
+        console.error(err);
+      }
+    });
+
     if (config.closeMessage) {
       const closeMessage = utils.readMultilineConfigValue(config.closeMessage);
       await thread.sendSystemMessageToUser(closeMessage).catch(() => {});
